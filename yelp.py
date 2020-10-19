@@ -27,7 +27,8 @@ def load_data_from_local():
     return yelp_business_df, yelp_covid_df
 
 # load data cov19 just use your function
-def load_data_cov19(geo_type, start_day = date(2020, 6, 10), end_day = date(2020, 6, 10)):
+def load_data_cov19(geo_type = 'state', start_day = date(2020, 6, 10), end_day = date(2020, 6, 10)):
+    # geo_type = 'state' or 'county'
     all_measures = ['confirmed_cumulative_num', 'confirmed_cumulative_prop', 'confirmed_incidence_num', 'confirmed_incidence_prop', 'deaths_cumulative_num', 'deaths_cumulative_prop',
                 'deaths_incidence_num', 'confirmed_7dav_cumulative_num', 'confirmed_7dav_cumulative_prop', 'confirmed_7dav_incidence_num', 'confirmed_7dav_incidence_prop',
                 'deaths_7dav_cumulative_num', 'deaths_7dav_cumulative_prop', 'deaths_7dav_incidence_num']
