@@ -76,7 +76,9 @@ def get_bool_df_summary(yelp_covid_bool_df):
     return group_dict
 
 def show_covid_feature_relationship(group_dict, sub_feature_list):
+
     st.write("You are showing the relationship between **{}**, for each graph, the whole data points are separated into two bars according to the feature along the y-axis, and each bar is separated into two colors by the feature along the x-axis".format(', '.join(sub_feature_list)))
+    
     chart = alt.vconcat()
     for feature in sub_feature_list:
         target_df = group_dict[feature]
@@ -175,19 +177,6 @@ if confirm_button_2:
     
 
 # st.multiselect('Select several affecting features.', total_feature)
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #TODO: data preprocessing
 
