@@ -12,13 +12,7 @@ from geopy.geocoders import Nominatim
 import addfips
 from vega_datasets import data
 import time
-
-cate_list = ['Restaurants',
- 'Shopping',
- 'Food',
- 'Home Services',
- 'Beauty & Spas',
- 'Health & Medical']
+from utils import cate_list_multi, cate_list, find_category, get_highlight_info
 
 def if_restaurant(x):
     if 'Restaurants' in x:
@@ -56,7 +50,7 @@ def if_health(x):
     else:
         return False
 
-cate_func = {cate_list[0]:if_restaurant, cate_list[1]:if_shopping, cate_list[2]:if_food, cate_list[3]:if_home_services, cate_list[4]:if_beauty_spa, cate_list[5]:if_health}
+cate_func = {cate_list_multi[0]:if_restaurant, cate_list_multi[1]:if_shopping, cate_list_multi[2]:if_food, cate_list_multi[3]:if_home_services, cate_list_multi[4]:if_beauty_spa, cate_list_multi[5]:if_health}
 
 @st.cache  # load data from url, when submitting
 def load_data_from_link():
@@ -157,7 +151,7 @@ def get_bool_df_summary(yelp_covid_bool_df):
 @st.cache
 def get_category(yelp_business_df):
     business_category_info = pd.DataFrame()
-    for cate in cate_list:
+    for cate in cate_list_multi:
         business_category_info[cate] = yelp_business_df['categories'].apply(cate_func[cate])
     
     return business_category_info
@@ -220,16 +214,12 @@ def show_covid_feature_multi_relationship(total_feature, yelp_covid_bool_df):
         st.write(chart)
 
 
-
-def find_category(x):
-
-    for cat in cate_list:
-        if cat in x:
-            return cat
-    return 'Others'
-
 def close_for_how_long(yelp_join):
-    st.write("There are {} businesses uploading closure notification.".format(sum(yelp_covid_df['Temporary Closed Until'] != 'FALSE')))
+    st.markdown("From now on, we retrive the original information in **Temporary Closed Until**, **Covid Banner**, and **highlights**.")
+    
+    st.write("First, let's see when do these temporarly closed businesses plan to reopen in June 10. There are {} businesses uploading closure notification.".format(sum(yelp_covid_df['Temporary Closed Until'] != 'FALSE')))
+    
+    st.write("You may select certain category you are interested in from the bottom box, and select certain time sub-interval to take a closer look, which could be done through bruching on the upper figurg.")
 
     close_time = yelp_join[yelp_join['Temporary Closed Until'] != 'FALSE']['Temporary Closed Until']
     close_time = list(close_time)
@@ -250,18 +240,20 @@ def close_for_how_long(yelp_join):
         alt.X("Close Until:T"),
         alt.Y("count()")
     ).properties(height=50, width=500).add_selection(brush)
-    
-    chart = base & alt.Chart(df[df['Close Until'] < '2021-01-01T00:00:00']).mark_bar().encode(
+
+
+    chart = base & alt.Chart(df[df['Close Until'] < '2021-01-01T00:00:00']).mark_bar(size=20).encode(
         alt.X("Close Until:T",
             scale=alt.Scale(domain=brush)),
         alt.Y("count()", title='Business number'),
         alt.Tooltip(["Close Until:T", "Category:N", "count()"]),
         color = alt.condition(picked, "Category:N", alt.value("lightgray")),
-    ).add_selection(picked).properties(height=200, width=500)
+    ).add_selection(picked).properties(height=300, width=500)
 
     st.write(chart)
 
-def what_covid_banner_say(yelp_covid_df, business_category_info, feature):
+def what_covid_banner_say(yelp_covid_df, business_category_info):
+    feature = st.selectbox("Choose a category you are interested in: ", ['whole'] + cate_list_multi)
     
     if feature == 'whole': 
         total_num = sum(yelp_covid_df['Covid Banner'] != 'FALSE')
@@ -270,7 +262,11 @@ def what_covid_banner_say(yelp_covid_df, business_category_info, feature):
         total_num = sum(yelp_covid_df['Covid Banner'][business_category_info[feature]] != 'FALSE')
         banner = list(yelp_covid_df['Covid Banner'][business_category_info[feature]].unique())
 
-    st.write("There are {} businesses uploading their Covid Banner.".format(total_num))
+    cate_str = "of category {}".format(feature)
+    if feature == 'whole':
+        cate_str = "in all"
+
+    st.write("There are {} businesses {} uploading their Covid Banner.".format(total_num, cate_str))
     st.write("Let's see what words frequently appear in that banner.")
     w = WordCloud(background_color='white', width=600, height=300)
     banner_str = ' '.join(banner)
@@ -278,19 +274,35 @@ def what_covid_banner_say(yelp_covid_df, business_category_info, feature):
     c = w.to_image()
     st.image(c)
 
+def what_are_highlights(business_highlight_info_short):
+    selected = alt.selection_multi(encodings=['y'], resolve='intersect')
+    selected_cate = alt.selection_multi(encodings=['y'])
+    chart = alt.Chart(business_highlight_info_short).mark_bar().encode(
+        alt.X('sum(count)'),
+        alt.Y('highlight:N', sort='-x'),
+        alt.Tooltip(['highlight', 'sum(count)']),
+        color = alt.condition(selected_cate, 'categories', alt.value("lightgray")),
+    ).add_selection(selected)& alt.Chart(business_highlight_info_short).mark_bar().encode(
+        alt.Y('categories:N'),
+        alt.X('sum(count)'),
+    ).add_selection(selected_cate).transform_filter(selected)
+
+    st.write(chart)
+
+
 def show_business_in_category(yelp_covid_bool_df, business_category_info):
     
     cat_info_cnt = pd.DataFrame()
-    feature = st.selectbox("I want to see business behavior in terms of:  ", yelp_covid_bool_df.columns[1:])
+    feature = st.selectbox("Select a Covid feature you are interested in:  ", yelp_covid_bool_df.columns[1:])
 
-    for cate in cate_list:
+    for cate in cate_list_multi:
         cat_info_cnt[cate] = yelp_covid_bool_df[business_category_info[cate]].groupby(feature).agg({'business_id':'count'})['business_id']
     
     cat_info_cnt = cat_info_cnt.transpose()
     st.bar_chart(pd.DataFrame(
         np.array(cat_info_cnt),
         columns=['False', 'True'],
-        index=cate_list
+        index=cate_list_multi
     ))
 
 
@@ -316,7 +328,7 @@ st.markdown("Datetime type: **Temporary Closed Until**")
 st.write("These features characterize business state under COVID19. We start by looking at the inner relationship between these features.")
 
 st.markdown("### 1.1 Covid feature correlation")
-st.write("We now change non-bool type features into bool types to see whether there is some inner correlation among these features.")
+st.write("We first change non-bool type features into bool types to see whether there is some inner correlation among these features.")
 
 yelp_covid_bool_df = get_bool_df(yelp_covid_df)
 show_df = st.checkbox("Show new data")
@@ -327,7 +339,7 @@ if show_df:
 total_feature = yelp_covid_bool_df.columns[1:]
 group_dict = get_bool_df_summary(yelp_covid_bool_df)
 
-# 1.3.1 Pairwise relationship
+# 1.1.1 Pairwise relationship
 st.write("Now let's explore whether these features are related. You may select several interested features below and press GO to run.")
 sub_feature_list = st.multiselect(
     'Show your interested subsets',
@@ -337,7 +349,7 @@ confirm_button = st.checkbox('GO!')
 if confirm_button:
     show_covid_feature_relationship(group_dict, sub_feature_list)
 
-# 1.3.2 show how one is affected by multiple
+# 1.1.2 show how one is affected by multiple
 show_covid_feature_multi_relationship(total_feature, yelp_covid_bool_df)
    
 #TODO: data preprocessing
@@ -429,18 +441,20 @@ st.write(base)
 
 st.write("## 2. Category and business state")
 
-st.markdown("Let's now explore how businesses aggregated in categories behave.")
+st.markdown("Let's now explore how businesses of different categories behave.")
 business_category_info = get_category(yelp_business_df)
 show_business_in_category(yelp_covid_bool_df, business_category_info)
 
 st.markdown("### 2.1 How long do they plan to close")
-st.markdown("From now on, we retrive the original information in **Temporary Closed Until**, **Covid Banner**, and **highlights**. First, let's see when do temporarly closed businesses plan to reopen in June 10. ")
 close_for_how_long(yelp_join)
 
 st.markdown("### 2.2 What do Covid Banner say")
+what_covid_banner_say(yelp_covid_df, business_category_info)
 
-feature = st.selectbox("Selected interested category: ", ['whole'] + cate_list)
-what_covid_banner_say(yelp_covid_df, business_category_info, feature)
+st.markdown("### 2.3 What are in the highlights")
+business_highlight_info = get_highlight_info(yelp_join)
+what_are_highlights(business_highlight_info)
+
 
 # TODO: state/city change
 
