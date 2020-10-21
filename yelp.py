@@ -12,45 +12,7 @@ from geopy.geocoders import Nominatim
 import addfips
 from vega_datasets import data
 import time
-from utils import cate_list_multi, cate_list, find_category, get_highlight_info
-
-def if_restaurant(x):
-    if 'Restaurants' in x:
-        return True
-    else:
-        return False
-    
-def if_shopping(x):
-    if 'Shopping' in x:
-        return True
-    else:
-        return False
-
-def if_food(x):
-    if 'Food' in x:
-        return True
-    else:
-        return False
-
-def if_home_services(x):
-    if 'Home Services' in x:
-        return True
-    else:
-        return False
-
-def if_beauty_spa(x):
-    if 'Beauty & Spas' in x:
-        return True
-    else:
-        return False
-
-def if_health(x):
-    if 'Health & Medical' in x:
-        return True
-    else:
-        return False
-
-cate_func = {cate_list_multi[0]:if_restaurant, cate_list_multi[1]:if_shopping, cate_list_multi[2]:if_food, cate_list_multi[3]:if_home_services, cate_list_multi[4]:if_beauty_spa, cate_list_multi[5]:if_health}
+from utils import cate_list_multi, cate_list, find_category, get_highlight_info, cate_func
 
 @st.cache  # load data from url, when submitting
 def load_data_from_link():
@@ -213,7 +175,6 @@ def show_covid_feature_multi_relationship(total_feature, yelp_covid_bool_df):
         )
         st.write(chart)
 
-
 def close_for_how_long(yelp_join):
     st.markdown("From now on, we retrive the original information in **Temporary Closed Until**, **Covid Banner**, and **highlights**.")
     
@@ -266,8 +227,8 @@ def what_covid_banner_say(yelp_covid_df, business_category_info):
     if feature == 'whole':
         cate_str = "in all"
 
-    st.write("There are {} businesses {} uploading their Covid Banner.".format(total_num, cate_str))
-    st.write("Let's see what words frequently appear in that banner.")
+    st.write("Next, let's turn to Covid Banner. There are {} businesses {} uploading their Covid Banner.".format(total_num, cate_str))
+    st.write("You may want see what words frequently appear in that banner, in whole, or in certain category.")
     w = WordCloud(background_color='white', width=600, height=300)
     banner_str = ' '.join(banner)
     w.generate(banner_str)
@@ -275,6 +236,8 @@ def what_covid_banner_say(yelp_covid_df, business_category_info):
     st.image(c)
 
 def what_are_highlights(business_highlight_info_short):
+    st.write("Now let's take a look at hightlights, which are put in the business information page. There are 7045 businesses in all updating their highlights in response to Covid 19. We can see what highlights are about.")
+    st.write("Below, we extract 11 covid 19 related highlights, and show their numbers decomposing in different categories. You may select one highlight and see in more detailed about its decomposition in the second figure. You may also select one particular category and compare highlight types of business belong to that category.")
     selected = alt.selection_multi(encodings=['y'], resolve='intersect')
     selected_cate = alt.selection_multi(encodings=['y'])
     chart = alt.Chart(business_highlight_info_short).mark_bar().encode(
