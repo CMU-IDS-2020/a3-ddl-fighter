@@ -32,6 +32,18 @@ covid_19_identifier = [
     'shipping_during_covid_19',
     'gift_cards_during_covid_19']
 
+def if_restaurant(x):
+    if 'Restaurant' in x:
+        return True
+    else:
+        return False
+
+def if_shopping(x):
+    if 'Shopping' in x:
+        return True
+    else:
+        return False
+
 def if_food(x):
     if 'Food' in x:
         return True
@@ -64,6 +76,8 @@ def find_category(x):
         if cat in x:
             return cat
     return 'Others'
+
+cate_func = {cate_list_multi[0]:if_restaurant, cate_list_multi[1]:if_shopping, cate_list_multi[2]:if_food, cate_list_multi[3]:if_home_services, cate_list_multi[4]:if_beauty_spa, cate_list_multi[5]:if_health}
 
 find_highlights_target = ''
 
