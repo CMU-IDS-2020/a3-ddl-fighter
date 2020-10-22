@@ -145,7 +145,7 @@ def show_covid_feature_multi_relationship(total_covid_feature, yelp_covid_bool_d
         # TODO: add tooltip
     ).properties(
         width=600,
-        height=200
+        height=120
     )
     st.write(chart)
 
@@ -263,37 +263,45 @@ def show_business_in_category(yelp_covid_bool_df, business_category_info):
 
     st.write("Of course, different types of businesses react differently. For example, you can see a huge part of Reastaurants and Food support **delivery and takeout**, while **request a quote** is nearly exclusively supported by Home Services.")
     
-
 def show_quality_summary(yelp_join):
     st.write("We first look at the distribution of **star ratings** and **review counts** in our dataset. Recall that the quality data is collected in March 2020, when the COVID was not that a serious concern, and thus could be used as a previous quality measure.")
+
+    st.write("Brush certain intervals from both figures to explore into certain stars and/or review counts.")
 
     out_start = yelp_join.groupby(['stars']).agg({'business_id':'count'})
     df_star = pd.DataFrame()
     df_star['stars'] = out_start.index
     df_star['count'] = list(out_start['business_id'])
 
-    bins = list(range(0, 150, 5))
-    labels = list(range(5, 150, 5))
+    bins = list(range(0, 150, 10))
+    labels = list(range(5, 145, 10))
     out_review = pd.cut(yelp_join['review_count'], bins=bins, labels=labels)
-    out_review = pd.DataFrame(out_review, dtype='object')    
-    out_group = out_review.groupby(['review_count']).agg({"review_count":"count"})
-    
-    df_review = pd.DataFrame()
-    df_review['review_count'] = out_group.index
-    df_review['count'] = list(out_group['review_count'])
+    out_review = pd.DataFrame(out_review, dtype='object')
+    out_review['stars'] = yelp_join['stars']
 
-    chart = alt.Chart(df_star).mark_bar(size=20).encode(
-        alt.X('stars'),
-        alt.Y('count'),
-        alt.Tooltip(['count', 'stars'])
-    ).properties(height=250, width=250)| alt.Chart(df_review).mark_bar().encode(
-                                alt.X('review_count', bin=True),
-                                alt.Y('count')
-                            ).properties(height=250, width=250)
+    out_df = out_review.groupby(['stars', 'review_count']).agg({'stars':'count'}).unstack().fillna(0).stack()    
+    out_df.columns = ['count']
+    out_df = out_df.reset_index(level=[0,1])
 
-    st.write(chart)
+    select = alt.selection_interval(encodings=['x'], resolve='intersect')
+
+    chart = alt.Chart(out_df).mark_bar(size=15).encode(
+                alt.X(
+                    alt.repeat("column"),
+                    type='quantitative',
+                ),
+                alt.Y('sum(count)', title='count')
+            ).properties(height=200, width=250)
+    combine_chart = alt.layer(
+                    chart.add_selection(select).encode(
+                        color = alt.value('lightgray')
+                    ),
+                    chart.transform_filter(select)
+                ).repeat(
+                    column=['stars', 'review_count']
+                )
+    st.write(combine_chart)
     st.markdown("You may find that **stars** are relatively scattered, while for **review counts**, they are pretty concentrated, and actually, though the most popular business can have more than 10,000 reviews, the 95 percentile of review count is 145.")
-
 
 def quality_vs_covid_feature(yelp_covid_bool_df, yelp_join):
 
