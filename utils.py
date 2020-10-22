@@ -3,6 +3,15 @@ import numpy as np
 import json
 import streamlit as st
 
+total_covid_feature = ['highlights', 
+    'delivery or takeout', 
+    'Grubhub enabled',
+    'Call To Action enabled', 
+    'Request a Quote Enabled', 
+    'Covid Banner',
+    'Temporary Closed Until', 
+    'Virtual Services Offered']
+
 # when allowed multi categories for one business
 cate_list_multi = ['Restaurants',
     'Shopping',
@@ -31,6 +40,11 @@ covid_19_identifier = [
     'virtual_estimates_during_covid_19',
     'shipping_during_covid_19',
     'gift_cards_during_covid_19']
+
+def if_covid_highlights(x):
+    if 'covid' in x:
+        return True
+    return False
 
 def if_restaurant(x):
     if 'Restaurant' in x:
@@ -68,16 +82,25 @@ def if_health(x):
     else:
         return False
 
+cate_func = {cate_list_multi[0]:if_restaurant, cate_list_multi[1]:if_shopping, cate_list_multi[2]:if_food, cate_list_multi[3]:if_home_services, cate_list_multi[4]:if_beauty_spa, cate_list_multi[5]:if_health}
 
-def find_category(x):
+@st.cache
+def get_category(yelp_join): # when allowed multi categories
+    # business_category_info: index same as yelp_covid_df
+
+    business_category_info = pd.DataFrame()
+    for cate in cate_list_multi:
+        business_category_info[cate] = yelp_join['categories'].apply(cate_func[cate])
+    
+    return business_category_info
+
+def find_category(x): # when only allowed single category
     if ('Restaurant' in x) or ('Food' in x):
         return cate_list[0]
     for cat in cate_list[1:]:
         if cat in x:
             return cat
     return 'Others'
-
-cate_func = {cate_list_multi[0]:if_restaurant, cate_list_multi[1]:if_shopping, cate_list_multi[2]:if_food, cate_list_multi[3]:if_home_services, cate_list_multi[4]:if_beauty_spa, cate_list_multi[5]:if_health}
 
 find_highlights_target = ''
 
@@ -122,6 +145,43 @@ def get_highlight_info(df_join):
 
     return business_highlight_info_short 
 
+@st.cache
+def get_bool_df(yelp_covid_df):
+    yelp_covid_bool_df = pd.DataFrame()
+    for feature in yelp_covid_df.columns:
+        if feature == 'business_id':
+            yelp_covid_bool_df[feature] = yelp_covid_df[feature]
+            continue     
+        if feature == 'highlights':
+            fill_in = yelp_covid_df[feature].apply(if_covid_highlights)
+        else:
+            fill_in = np.zeros(yelp_covid_df.shape[0], dtype='bool')
+            fill_in[yelp_covid_df[feature] != 'FALSE'] = True
+        yelp_covid_bool_df[feature] = fill_in
+
+    return yelp_covid_bool_df
+
+@st.cache
+def get_bool_df_summary(yelp_covid_bool_df):
+    group_dict = {}
+    target_df = pd.DataFrame()
+    for target_feature in total_covid_feature:
+        target_df = pd.DataFrame()
+
+        for other_feature in total_covid_feature:
+            if other_feature == target_feature:
+                group_part = list(yelp_covid_bool_df.groupby(by=[target_feature]).agg({'business_id':'count', target_feature:'min'})['business_id'])
+                group_part.insert(1,0)
+                group_part.insert(3,0)
+                target_df[target_feature + ' type'] = [False, False, True, True]
+                target_df[target_feature] = group_part
+            else:
+                group_part = yelp_covid_bool_df.groupby(by=[target_feature, other_feature]).agg({'business_id':'count',target_feature:'min',other_feature:'min'})
+                target_df[other_feature + ' type'] = list(group_part[other_feature])
+                target_df[other_feature] = list(group_part['business_id'])
+        group_dict[target_feature] = target_df
+
+    return group_dict
 
 
 
