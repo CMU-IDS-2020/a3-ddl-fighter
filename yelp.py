@@ -298,15 +298,34 @@ def show_quality_summary(yelp_join):
 def quality_vs_covid_feature(yelp_covid_bool_df, yelp_join):
 
     st.markdown("Now, let's explore into the relationship among **stars**, **review counts** and **COVID features**. It is likely that business states are affected by their previous quality.")
-    st.write("Due to the huge size of original dataset, we use sampling strategy. Let's start by choosing a **sample size**!")
 
-    sample_size = st.slider("Select how mamy points you want to sample for each case: ", min_value=50, max_value=500, value=100)
-
-    st.markdown("You may select one **COVID feature** to see whether a business has it or not depends on stars and review counts.")
+    st.markdown("Let's start by selecting one **COVID feature** to see whether a business has it or not depends on stars and review counts.")
 
     selected_feature = st.selectbox("Select the covid feature you want to explore: ", total_covid_feature)
 
-    st.markdown("You may also want filter some extremely large review counts, according to your observation in the **Quality Overview**. By default, we are showing you the whole range. ")
+    st.write("Let's see how the whether the median of stars and review counts are different between businesses having {}, and those not.".format(selected_feature))
+
+    df = pd.DataFrame()
+    df['stars'] = yelp_join['stars']
+    df['review_count'] = yelp_join['review_count']
+    df[selected_feature] = yelp_covid_bool_df[selected_feature]
+
+    df = df.groupby(selected_feature).agg({'stars':'median', 'review_count':'median'})
+    df[selected_feature] = ['False', 'True']
+    chart = alt.Chart(df).mark_bar().encode(
+        alt.Y(selected_feature),
+        alt.X('stars')
+    ).properties(height=50, width=250) | alt.Chart(df).mark_bar().encode(
+        alt.Y(selected_feature),
+        alt.X('review_count')
+    ).properties(height=50, width=250)
+    st.write(chart)
+
+    st.write("We can go deeper into individuals! However, due to the huge size of original dataset, we use sampling strategy. Let's choose a **sample size**!")
+
+    sample_size = st.slider("Select how mamy points you want to sample for each case: ", min_value=50, max_value=500, value=100)
+
+    st.markdown("You may want filter some extremely large review counts, according to your observation in the **Quality Overview**. By default, we are showing you the whole range. ")
 
     filter_above = 10130
     filter_above = st.number_input("I only want to sample points from review counts under: ", min_value=100, max_value=10130, value=10130)
@@ -320,7 +339,7 @@ def quality_vs_covid_feature(yelp_covid_bool_df, yelp_join):
     df_sample = pd.DataFrame()
     df_sample['review_count'] = list(yelp_join['review_count'][true_idx]) + list(yelp_join['review_count'][false_idx])
     df_sample['ratings'] = list(yelp_join['stars'][true_idx]) + list(yelp_join['stars'][false_idx])
-    df_sample[selected_feature] = [True] * sample_size + [False] * sample_size   
+    df_sample[selected_feature] = ['True'] * sample_size + ['False'] * sample_size   
 
     selected = alt.selection_multi(fields=[selected_feature], on='dblclick', bind='legend')
     chart = alt.Chart(df_sample).mark_point(size=35).encode(
@@ -330,10 +349,10 @@ def quality_vs_covid_feature(yelp_covid_bool_df, yelp_join):
         opacity=alt.condition(selected, alt.value(1), alt.value(0.2))
     ).add_selection(selected).properties(width=600).interactive()
 
-    st.write("Now you have your graph! Try to double click one point or a True/False (1/0) on the right to highlight a certain group.")
+    st.write("Now you have your graph! Try to double click one point or a True/False on the right to highlight a certain group.")
     st.write(chart)
 
-    st.write("You may see that stars do not influence much, while more businesses are more likely to react.")
+    st.write("You may see that stars do not influence much, while more popular businesses are more likely to react.")
     
 
 yelp_business_df, yelp_covid_df, yelp_join = load_data_from_local() #load_data_from_url()
