@@ -7,11 +7,11 @@ import altair as alt
 from wordcloud import WordCloud
 import covidcast
 import geopandas as gpd
-# import us
-# from geopy.geocoders import Nominatim
-# import addfips
-# from vega_datasets import data
-# import time
+import us
+from geopy.geocoders import Nominatim
+import addfips
+from vega_datasets import data
+import time
 from utils import total_covid_feature, cate_list_multi, cate_list, cate_func, find_category, get_category, get_highlight_info, get_bool_df, get_bool_df_summary
 
 @st.cache  # load data from url, when submitting
@@ -52,14 +52,14 @@ def load_data_from_local():
 def get_join_dataset(dataset1, dataset2, col):
     return pd.merge(dataset1, dataset2, on=col)
 
-'''
+
 @st.cache
 # get the state name to id dic
 def get_state_ref():
     state_ref = pd.read_json(data.income.url)[['name', 'id']].groupby(['name']).mean()  
     # city_ref = pd.read_json("dataset/yelp_academic_dataset_covid_features.json", lines=True)
     return state_ref
-'''
+
 
 
 @st.cache(allow_output_mutation=True)
@@ -360,7 +360,7 @@ show_covid_feature_multi_relationship(total_covid_feature, yelp_covid_bool_df)
    
 #TODO: data preprocessing
 
-'''
+
 st.write("Then let us look at the cov19 dataset.") 
 #TODO: add some analysis not important
 
@@ -444,8 +444,7 @@ base = alt.Chart(source).mark_circle().encode(
     y=inf_rate_target + ':Q',
 )
 st.write(base)
-'''
-# zwy part
+
 st.write("## 2. Category and business state")
 
 st.markdown("Let's now explore how businesses of different categories behave. We start by looking at whether different categories behave differently on having the above COVID features.")
