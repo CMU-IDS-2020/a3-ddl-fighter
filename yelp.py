@@ -124,7 +124,9 @@ def show_covid_feature_relationship(group_dict, sub_feature_list):
     #st.write(chart)
 
 def show_covid_feature_multi_relationship(total_covid_feature, yelp_covid_bool_df):
-    st.write("You may also want to see how multi features affect certain feature.")
+    st.write("You may also want to see how **multi** features affect certain feature.")
+    
+    st.write("Try to select an affected feature below and the affecting features on the side bar.")
     affected = st.selectbox('Select one affected feature.', total_covid_feature, 0)
     affecting = {}
     for other_feature in total_covid_feature:
@@ -138,11 +140,13 @@ def show_covid_feature_multi_relationship(total_covid_feature, yelp_covid_bool_d
             flag &= yelp_covid_bool_df[ele] == True
         elif affecting[ele] == 'False':
             flag &= yelp_covid_bool_df[ele] == False
-    group_out = yelp_covid_bool_df[flag].groupby(by=[affected]).agg({'business_id': 'count', affected: 'min'})
+    group_out = yelp_covid_bool_df[flag].groupby(by=[affected]).agg({'business_id': 'count'})
+    group_out.columns = ['count']
+    group_out[affected] = ['False', 'True']
     chart = alt.Chart(group_out).mark_bar().encode(
         alt.Y(affected + ':N'),
-        alt.X('business_id:Q'),
-        # TODO: add tooltip
+        alt.X('count:Q'),
+        alt.Tooltip([affected, 'count'])
     ).properties(
         width=600,
         height=120
@@ -247,6 +251,7 @@ def show_business_in_category(yelp_covid_bool_df, business_category_info):
     for cate in cate_list_multi:
         cat_info_cnt[cate] = yelp_covid_bool_df[business_category_info[cate]].groupby(feature).agg({'business_id':'count'})['business_id']
     
+    cat_info_cnt.index = ['False','True']
     cat_info_cnt = cat_info_cnt.stack().reset_index(level=[0,1])
     cat_info_cnt.columns = [feature, 'categories', 'count']
     chart = alt.Chart(cat_info_cnt).mark_bar().encode(
@@ -409,7 +414,6 @@ if confirm_button:
 # 1.1.2 show how one is affected by multiple
 show_covid_feature_multi_relationship(total_covid_feature, yelp_covid_bool_df)
    
-#TODO: data preprocessing
 
 '''
 st.write("Then let us look at the cov19 dataset.") 
@@ -499,7 +503,7 @@ st.write(base)
 
 st.write("## 3. How businesses' categories affect their reaction?")
 
-st.markdown("Let's now explore how businesses of different categories behave. We start by looking at whether different categories react differently with the above COVID features. Recall 1 represents true and 0 represents false. ")
+st.markdown("Let's now explore how businesses of different categories behave. We start by looking at whether different categories react differently with the above COVID features.")
 business_category_info = get_category(yelp_join)
 show_business_in_category(yelp_covid_bool_df, business_category_info)
 
