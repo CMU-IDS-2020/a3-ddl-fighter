@@ -7,11 +7,11 @@ import altair as alt
 from wordcloud import WordCloud
 import covidcast
 import geopandas as gpd
-import us
-from geopy.geocoders import Nominatim
-import addfips
-from vega_datasets import data
-import time
+# import us
+# from geopy.geocoders import Nominatim
+# import addfips
+# from vega_datasets import data
+# import time
 from utils import cate_list_multi, cate_list, find_category, get_highlight_info, cate_func
 
 @st.cache  # load data from url, when submitting
@@ -50,12 +50,14 @@ def load_data_from_local():
 def get_join_dataset(dataset1, dataset2, col):
     return pd.merge(dataset1, dataset2, on=col)
 
+'''
 @st.cache
 # get the state name to id dic
 def get_state_ref():
     state_ref = pd.read_json(data.income.url)[['name', 'id']].groupby(['name']).mean()  
     # city_ref = pd.read_json("dataset/yelp_academic_dataset_covid_features.json", lines=True)
     return state_ref
+'''
 
 
 @st.cache(allow_output_mutation=True)
@@ -237,7 +239,8 @@ def what_covid_banner_say(yelp_covid_df, business_category_info):
 
 def what_are_highlights(business_highlight_info_short):
     st.write("Now let's take a look at hightlights, which are put in the business information page. There are 7045 businesses in all updating their highlights in response to Covid 19. We can see what highlights are about.")
-    st.write("Below, we extract 11 covid 19 related highlights, and show their numbers decomposing in different categories. You may select one highlight and see in more detailed about its decomposition in the second figure. You may also select one particular category and compare highlight types of business belong to that category.")
+    st.write("Below, we extract 11 COVID-19 related highlights, and show their counts decomposing in different categories.")
+    st.write("You may select one highlight and see in more detailed about its decomposition in the second figure. You may also select one particular category and compare highlight types of business belong to that category.")
     selected = alt.selection_multi(encodings=['y'], resolve='intersect')
     selected_cate = alt.selection_multi(encodings=['y'])
     chart = alt.Chart(business_highlight_info_short).mark_bar().encode(
@@ -317,7 +320,7 @@ show_covid_feature_multi_relationship(total_feature, yelp_covid_bool_df)
    
 #TODO: data preprocessing
 
-
+'''
 st.write("Then let us look at the cov19 dataset.") 
 #TODO: add some analysis not important
 
@@ -401,10 +404,11 @@ base = alt.Chart(source).mark_circle().encode(
     y=inf_rate_target + ':Q',
 )
 st.write(base)
-
+'''
+# zwy part
 st.write("## 2. Category and business state")
 
-st.markdown("Let's now explore how businesses of different categories behave.")
+st.markdown("Let's now explore how businesses of different categories behave. We start by looking at whether different categories behave differently on having the above COVID features.")
 business_category_info = get_category(yelp_business_df)
 show_business_in_category(yelp_covid_bool_df, business_category_info)
 
@@ -417,6 +421,10 @@ what_covid_banner_say(yelp_covid_df, business_category_info)
 st.markdown("### 2.3 What are in the highlights")
 business_highlight_info = get_highlight_info(yelp_join)
 what_are_highlights(business_highlight_info)
+
+st.write("## 3. Quality and business state")
+
+st.markdown("Does business quality before COVID-19 have some relationship with their state during COVID-19? We would look at their popularity, measured by review counts, and their ratings.")
 
 
 # TODO: state/city change
