@@ -3,9 +3,10 @@ import numpy as np
 import json
 import streamlit as st
 
-total_covid_feature = ['highlights', 
+total_covid_feature = [
     'delivery or takeout', 
     'Grubhub enabled',
+    'highlights', 
     'Call To Action enabled', 
     'Request a Quote Enabled', 
     'Covid Banner',

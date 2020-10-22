@@ -241,11 +241,76 @@ def show_business_in_category(yelp_covid_bool_df, business_category_info):
         index=cate_list_multi
     ))
 
-def show_quality_summary():
-    pass
+def show_quality_summary(yelp_join):
+    st.write("We first look at the distribution of star ratings and review counts in our dataset.")
 
-def quality_vs_covid_feature():
-    pass
+    out_start = yelp_join.groupby(['stars']).agg({'business_id':'count'})
+    df_star = pd.DataFrame()
+    df_star['stars'] = out_start.index
+    df_star['count'] = list(out_start['business_id'])
+
+    bins = list(range(0, 150, 5))
+    labels = list(range(5, 150, 5))
+    out_review = pd.cut(yelp_join['review_count'], bins=bins, labels=labels)
+    out_review = pd.DataFrame(out_review, dtype='object')    
+    out_group = out_review.groupby(['review_count']).agg({"review_count":"count"})
+    
+    df_review = pd.DataFrame()
+    df_review['review_count'] = out_group.index
+    df_review['count'] = list(out_group['review_count'])
+
+    chart = alt.Chart(df_star).mark_bar(size=20).encode(
+        alt.X('stars'),
+        alt.Y('count'),
+        alt.Tooltip(['count', 'stars'])
+    ).properties(height=250, width=250)| alt.Chart(df_review).mark_bar().encode(
+                                alt.X('review_count', bin=True),
+                                alt.Y('count')
+                            ).properties(height=250, width=250)
+
+    st.write(chart)
+    st.markdown("You may find that **stars** are relatively scattered, while for **review counts**, they are pretty concentrated, and actually, though the most popular business can have more than 10,000 reviews, the 95 percentile of review count is 145.")
+
+
+
+def quality_vs_covid_feature(yelp_covid_bool_df, yelp_join):
+
+    st.markdown("Now, let's explore into the relationship among **stars**, **review counts** and **COVID features**. It is likely that business states are affected by their previous quality. Recall that the quality data is collected in March 2020, when the COVID was not that a serious concern.")
+    st.write("Due to the huge size of original dataset, we use sampling strategy. Let's start by choosing a **sample size**!")
+
+    sample_size = st.slider("Select how mamy points you want to sample for each case: ", min_value=50, max_value=500, value=100)
+
+    st.markdown("You may select one **COVID feature** to see whether a business has it or not depends on stars and review counts.")
+
+    selected_feature = st.selectbox("Select the covid feature you want to explore: ", total_covid_feature)
+
+    st.markdown("You may also want filter some extremely large review counts, according to your observation in the **Quality Overview**. By default, we are showing you the whole range. ")
+
+    filter_above = 10130
+    filter_above = st.number_input("I only want to sample points from review counts under: ", min_value=100, max_value=10130, value=10130)
+
+    chk_true = yelp_covid_bool_df[selected_feature] & (yelp_join['review_count'] < filter_above)
+    chk_false = (yelp_covid_bool_df[selected_feature] == False) & (yelp_join['review_count'] < filter_above)
+
+    true_idx = np.random.choice(yelp_covid_bool_df[chk_true].index, sample_size, replace=False)
+    false_idx = np.random.choice(yelp_covid_bool_df[chk_false].index, sample_size, replace=False)
+
+    df_sample = pd.DataFrame()
+    df_sample['review_count'] = list(yelp_join['review_count'][true_idx]) + list(yelp_join['review_count'][false_idx])
+    df_sample['ratings'] = list(yelp_join['stars'][true_idx]) + list(yelp_join['stars'][false_idx])
+    df_sample[selected_feature] = [True] * sample_size + [False] * sample_size   
+
+    selected = alt.selection_multi(fields=[selected_feature], on='dblclick', bind='legend')
+    chart = alt.Chart(df_sample).mark_point(size=35).encode(
+        alt.X('review_count'),
+        alt.Y('ratings:Q', scale=alt.Scale(domain=[0.5,5.5])),
+        alt.Color(selected_feature),
+        opacity=alt.condition(selected, alt.value(1), alt.value(0.2))
+    ).add_selection(selected).properties(width=600).interactive()
+
+    st.write("Now you have your graph! Try to click one point or a True/False (1/0) on the right to highlight a certain group.")
+    st.write(chart)
+    
 
 yelp_business_df, yelp_covid_df, yelp_join = load_data_from_local() #load_data_from_url()
 
@@ -402,6 +467,11 @@ st.write("## 3. Quality and business state")
 
 st.markdown("Does business quality before COVID-19 have some relationship with their state during COVID-19? We would look at their popularity, measured by review counts, and their ratings.")
 
+st.markdown("### 3.1 Quality overview")
+show_quality_summary(yelp_join)
+
+st.markdown("### 3.2 Stars, review counts, and COVID features")
+quality_vs_covid_feature(yelp_covid_bool_df, yelp_join)
 
 # TODO: state/city change
 
