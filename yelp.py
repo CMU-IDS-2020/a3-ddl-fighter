@@ -12,7 +12,7 @@ import geopandas as gpd
 # import addfips
 # from vega_datasets import data
 # import time
-from utils import cate_list_multi, cate_list, find_category, get_highlight_info, cate_func
+from utils import total_covid_feature, cate_list_multi, cate_list, cate_func, find_category, get_category, get_highlight_info, get_bool_df, get_bool_df_summary
 
 @st.cache  # load data from url, when submitting
 def load_data_from_link():
@@ -76,50 +76,6 @@ def load_data_cov19(geo_type = 'state', start_day = date(2020, 6, 10), end_day =
     
     return covid_data
 
-@st.cache
-def get_bool_df(yelp_covid_df):
-    yelp_covid_bool_df = pd.DataFrame()
-    for feature in yelp_covid_df.columns:
-        if feature == 'business_id':
-            yelp_covid_bool_df[feature] = yelp_covid_df[feature]
-            continue
-        fill_in = np.zeros(yelp_covid_df.shape[0], dtype='bool')
-        fill_in[yelp_covid_df[feature] != 'FALSE'] = True
-        yelp_covid_bool_df[feature] = fill_in
-
-    return yelp_covid_bool_df
-
-@st.cache
-def get_bool_df_summary(yelp_covid_bool_df):
-    group_dict = {}
-    total_feature = yelp_covid_bool_df.columns[1:]
-    target_df = pd.DataFrame()
-    for target_feature in total_feature:
-        target_df = pd.DataFrame()
-
-        for other_feature in total_feature:
-            if other_feature == target_feature:
-                group_part = list(yelp_covid_bool_df.groupby(by=[target_feature]).agg({'business_id':'count', target_feature:'min'})['business_id'])
-                group_part.insert(1,0)
-                group_part.insert(3,0)
-                target_df[target_feature + ' type'] = [False, False, True, True]
-                target_df[target_feature] = group_part
-            else:
-                group_part = yelp_covid_bool_df.groupby(by=[target_feature, other_feature]).agg({'business_id':'count',target_feature:'min',other_feature:'min'})
-                target_df[other_feature + ' type'] = list(group_part[other_feature])
-                target_df[other_feature] = list(group_part['business_id'])
-        group_dict[target_feature] = target_df
-
-    return group_dict
-
-@st.cache
-def get_category(yelp_business_df):
-    business_category_info = pd.DataFrame()
-    for cate in cate_list_multi:
-        business_category_info[cate] = yelp_business_df['categories'].apply(cate_func[cate])
-    
-    return business_category_info
-
 def show_covid_feature_relationship(group_dict, sub_feature_list):
 
     st.write("You are showing the relationship between **{}**, for each graph, the whole data points are separated into two bars according to the feature along the y-axis, and each bar is separated into two colors by the feature along the x-axis".format(', '.join(sub_feature_list)))
@@ -149,11 +105,11 @@ def show_covid_feature_relationship(group_dict, sub_feature_list):
     st.altair_chart(chart)
     #st.write(chart)
 
-def show_covid_feature_multi_relationship(total_feature, yelp_covid_bool_df):
+def show_covid_feature_multi_relationship(total_covid_feature, yelp_covid_bool_df):
     st.write("You may also want to see how multi features affect certain feature.")
-    affected = st.selectbox('Select one affected feature.', total_feature, 0)
+    affected = st.selectbox('Select one affected feature.', total_covid_feature, 0)
     affecting = {}
-    for other_feature in total_feature:
+    for other_feature in total_covid_feature:
         if other_feature == affected:
             continue
         affecting[other_feature] = st.sidebar.selectbox(other_feature, ["Don't care", 'True', 'False'])
@@ -255,7 +211,6 @@ def what_are_highlights(business_highlight_info_short):
 
     st.write(chart)
 
-
 def show_business_in_category(yelp_covid_bool_df, business_category_info):
     
     cat_info_cnt = pd.DataFrame()
@@ -297,26 +252,26 @@ st.markdown("### 1.1 Covid feature correlation")
 st.write("We first change non-bool type features into bool types to see whether there is some inner correlation among these features.")
 
 yelp_covid_bool_df = get_bool_df(yelp_covid_df)
-show_df = st.checkbox("Show new data")
+show_df = st.checkbox("Show transformed data")
+st.write(yelp_covid_bool_df[total_covid_feature].sum())
 if show_df:
-    st.dataframe(yelp_covid_bool_df.head())
+    st.write(yelp_covid_bool_df.head())
 # TODO: maybe we can take some not FALSE value in displaying the dataset
 
-total_feature = yelp_covid_bool_df.columns[1:]
 group_dict = get_bool_df_summary(yelp_covid_bool_df)
 
 # 1.1.1 Pairwise relationship
 st.write("Now let's explore whether these features are related. You may select several interested features below and press GO to run.")
 sub_feature_list = st.multiselect(
     'Show your interested subsets',
-    total_feature
+    total_covid_feature
 )
 confirm_button = st.checkbox('GO!')
 if confirm_button:
     show_covid_feature_relationship(group_dict, sub_feature_list)
 
 # 1.1.2 show how one is affected by multiple
-show_covid_feature_multi_relationship(total_feature, yelp_covid_bool_df)
+show_covid_feature_multi_relationship(total_covid_feature, yelp_covid_bool_df)
    
 #TODO: data preprocessing
 
