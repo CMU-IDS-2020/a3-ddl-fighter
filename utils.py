@@ -184,5 +184,23 @@ def get_bool_df_summary(yelp_covid_bool_df):
 
     return group_dict
 
+def get_dataset(feature_set, feature_list, label_set, label, ratio):
+    feature_list.append('business_id')
+    feature_set = feature_set[feature_list]
+    total_set = pd.merge(feature_set, label_set[['business_id', label]], on='business_id')
+    # total_set
+    total_label = (total_set.to_numpy()[:, -1]).reshape((-1)).astype('int')
+    total_features = total_set[feature_list]
+    total_features = pd.concat([total_features, get_category(total_features)], axis=1)
+    total_features = pd.concat([total_features, pd.get_dummies(total_features['state'])], axis=1)
+    total_features = total_features.drop(['categories', 'business_id', 'state'], axis=1)
+    st.write("The dataset after preprocessing is like this:", total_features.head())
+    # get_category = 
+    total_features = total_features.to_numpy()
+    train_num = int(len(total_features) * ratio)
+
+    return total_features[0 : train_num], total_label[0 : train_num], total_features[train_num + 1: ], total_label[train_num + 1: ]
+
+
 
 
