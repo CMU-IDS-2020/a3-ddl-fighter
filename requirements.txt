@@ -10,6 +10,5 @@ us
 geopy
 addfips
 vega_datasets
-time
 sklearn
 
