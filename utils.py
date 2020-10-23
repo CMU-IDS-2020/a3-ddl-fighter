@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import json
 import streamlit as st
+from sklearn.preprocessing import scale
 
 total_covid_feature = [
     'delivery or takeout', 
@@ -184,6 +185,8 @@ def get_bool_df_summary(yelp_covid_bool_df):
 
     return group_dict
 
+
+@st.cache
 def get_dataset(feature_set, feature_list, label_set, label, ratio):
     feature_list.append('business_id')
     feature_set = feature_set[feature_list]
@@ -196,7 +199,7 @@ def get_dataset(feature_set, feature_list, label_set, label, ratio):
     total_features = total_features.drop(['categories', 'business_id', 'state'], axis=1)
     st.write("The dataset after preprocessing is like this:", total_features.head())
     # get_category = 
-    total_features = total_features.to_numpy()
+    total_features = scale(total_features.to_numpy())
     train_num = int(len(total_features) * ratio)
 
     return total_features[0 : train_num], total_label[0 : train_num], total_features[train_num + 1: ], total_label[train_num + 1: ]

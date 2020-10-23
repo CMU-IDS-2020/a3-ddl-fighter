@@ -427,6 +427,23 @@ show_covid_feature_multi_relationship(total_covid_feature, yelp_covid_bool_df)
 # city
 # geometric interactive, state/city
 
+st.write("## 3. How Businesses' affect their reaction?")
+
+st.markdown("Let's now explore how businesses of different categories behave. \
+    We start by looking at whether different categories react differently with the above COVID features.")
+business_category_info = get_category(yelp_join)
+show_business_in_category(yelp_covid_bool_df, business_category_info)
+
+st.markdown("### 3.1 How long do they plan to close")
+close_for_how_long(yelp_join)
+
+st.markdown("### 3.2 What do Covid Banner say")
+what_covid_banner_say(yelp_join, business_category_info)
+
+st.markdown("### 3.3 What are in the highlights")
+business_highlight_info = get_highlight_info(yelp_join)
+what_are_highlights(business_highlight_info)
+
 
 st.markdown("## 2. How Businesses' location affect their reaction?")
 
@@ -539,22 +556,7 @@ base = alt.Chart(source).mark_circle().encode(
 ).interactive()
 st.write(base)
 
-st.write("## 3. How Businesses' affect their reaction?")
 
-st.markdown("Let's now explore how businesses of different categories behave. \
-    We start by looking at whether different categories react differently with the above COVID features.")
-business_category_info = get_category(yelp_join)
-show_business_in_category(yelp_covid_bool_df, business_category_info)
-
-st.markdown("### 3.1 How long do they plan to close")
-close_for_how_long(yelp_join)
-
-st.markdown("### 3.2 What do Covid Banner say")
-what_covid_banner_say(yelp_join, business_category_info)
-
-st.markdown("### 3.3 What are in the highlights")
-business_highlight_info = get_highlight_info(yelp_join)
-what_are_highlights(business_highlight_info)
 
 st.write("## 4. How businesses' quality affect their reaction?")
 
@@ -576,6 +578,7 @@ total_targets = yelp_covid_bool_df.columns[1:]
 label = st.selectbox('Select one target you want to explore more.', total_targets, 0)
 
 X_train, y_train, X_test, y_test = get_dataset(yelp_business_df, ['state', 'categories', 'stars', 'review_count'], yelp_covid_bool_df, label, 0.8)
+st.write("The dataset after preprocessing is like this:", X_train[0:5])
 
 choose_model = st.selectbox("Choose the ML Model",
 		["Logistic Regression", "Decision Tree", "K-Nearest Neighbours"])

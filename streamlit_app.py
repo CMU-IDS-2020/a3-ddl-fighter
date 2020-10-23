@@ -576,6 +576,7 @@ total_targets = yelp_covid_bool_df.columns[1:]
 label = st.selectbox('Select one target you want to explore more.', total_targets, 0)
 
 X_train, y_train, X_test, y_test = get_dataset(yelp_business_df, ['state', 'categories', 'stars', 'review_count'], yelp_covid_bool_df, label, 0.8)
+st.write("The dataset after preprocessing is like this:", X_train[0:5])
 
 choose_model = st.selectbox("Choose the ML Model",
 		["Logistic Regression", "Decision Tree", "K-Nearest Neighbours"])
