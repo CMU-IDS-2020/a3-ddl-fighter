@@ -12,7 +12,11 @@ from geopy.geocoders import Nominatim
 import addfips
 from vega_datasets import data
 import time
-from utils import cate_list_multi, cate_list, find_category, get_highlight_info, cate_func
+from sklearn import metrics
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import LogisticRegression
+from utils import total_covid_feature, cate_list_multi, cate_list, cate_func, find_category, get_category, get_highlight_info, get_bool_df, get_bool_df_summary, get_dataset
 
 @st.cache  # load data from url, when submitting
 def load_data_from_link():
@@ -45,7 +49,6 @@ def load_data_from_local():
 
     return yelp_business_df, yelp_covid_df, yelp_join
 
-@st.cache 
 #merge cov19 yelp dataset and big business dataset
 def get_join_dataset(dataset1, dataset2, col):
     return pd.merge(dataset1, dataset2, on=col)
@@ -268,27 +271,129 @@ def show_business_in_category(yelp_covid_bool_df, business_category_info):
         index=cate_list_multi
     ))
 
+def show_quality_summary(yelp_join):
+    st.write("We first look at the distribution of **star ratings** and **review counts** in our dataset. Recall that the quality data is collected in March 2020, when the COVID was not that a serious concern, and thus could be used as a previous quality measure.")
 
-yelp_business_df, yelp_covid_df, yelp_join = load_data_from_local() #load_data_from_url()
+    st.write("Brush certain intervals from both figures to explore into certain stars and/or review counts.")
 
-st.title("How does business behave during COVID19")
+    out_start = yelp_join.groupby(['stars']).agg({'business_id':'count'})
+    df_star = pd.DataFrame()
+    df_star['stars'] = out_start.index
+    df_star['count'] = list(out_start['business_id'])
 
-st.write("We jointly use the data from two datasets, first let us look at their dataframe seperately.")
+    bins = list(range(0, 150, 10))
+    labels = list(range(5, 145, 10))
+    out_review = pd.cut(yelp_join['review_count'], bins=bins, labels=labels)
+    out_review = pd.DataFrame(out_review, dtype='object')
+    out_review['stars'] = yelp_join['stars']
+
+    out_df = out_review.groupby(['stars', 'review_count']).agg({'stars':'count'}).unstack().fillna(0).stack()    
+    out_df.columns = ['count']
+    out_df = out_df.reset_index(level=[0,1])
+
+    select = alt.selection_interval(encodings=['x'], resolve='intersect')
+
+    chart = alt.Chart(out_df).mark_bar(size=15).encode(
+                alt.X(
+                    alt.repeat("column"),
+                    type='quantitative',
+                ),
+                alt.Y('sum(count)', title='count')
+            ).properties(height=200, width=250)
+    combine_chart = alt.layer(
+                    chart.add_selection(select).encode(
+                        color = alt.value('lightgray')
+                    ),
+                    chart.transform_filter(select)
+                ).repeat(
+                    column=['stars', 'review_count']
+                )
+    st.write(combine_chart)
+    st.markdown("You may find that **stars** are relatively scattered, while for **review counts**, they are pretty concentrated, and actually, though the most popular business can have more than 10,000 reviews, the 95 percentile of review count is 145.")
+
+def quality_vs_covid_feature(yelp_covid_bool_df, yelp_join):
+
+    st.markdown("Now, let's explore into the relationship among **stars**, **review counts** and **COVID features**. It is likely that business states are affected by their previous quality.")
+
+    st.markdown("Let's start by selecting one **COVID feature** to see whether a business has it or not depends on stars and review counts.")
+
+    selected_feature = st.selectbox("Select the covid feature you want to explore: ", total_covid_feature)
+
+    st.write("Let's see how the whether the median of stars and review counts are different between businesses having {}, and those not.".format(selected_feature))
+
+    df = pd.DataFrame()
+    df['stars'] = yelp_join['stars']
+    df['review_count'] = yelp_join['review_count']
+    df[selected_feature] = yelp_covid_bool_df[selected_feature]
+
+    df = df.groupby(selected_feature).agg({'stars':'median', 'review_count':'median'})
+    df[selected_feature] = ['False', 'True']
+    chart = alt.Chart(df).mark_bar().encode(
+        alt.Y(selected_feature),
+        alt.X('stars')
+    ).properties(height=50, width=250) | alt.Chart(df).mark_bar().encode(
+        alt.Y(selected_feature),
+        alt.X('review_count')
+    ).properties(height=50, width=250)
+    st.write(chart)
+
+    st.write("We can go deeper into individuals! However, due to the huge size of original dataset, we use sampling strategy. Let's choose a **sample size**!")
+
+    sample_size = st.slider("Select how mamy points you want to sample for each case: ", min_value=50, max_value=500, value=100)
+
+    st.markdown("You may want filter some extremely large review counts, according to your observation in the **Quality Overview**. By default, we are showing you the whole range. ")
+
+    filter_above = 10130
+    filter_above = st.number_input("I only want to sample points from review counts under: ", min_value=100, max_value=10130, value=10130)
+
+    chk_true = yelp_covid_bool_df[selected_feature] & (yelp_join['review_count'] < filter_above)
+    chk_false = (yelp_covid_bool_df[selected_feature] == False) & (yelp_join['review_count'] < filter_above)
+
+    true_idx = np.random.choice(yelp_covid_bool_df[chk_true].index, sample_size, replace=False)
+    false_idx = np.random.choice(yelp_covid_bool_df[chk_false].index, sample_size, replace=False)
+
+    df_sample = pd.DataFrame()
+    df_sample['review_count'] = list(yelp_join['review_count'][true_idx]) + list(yelp_join['review_count'][false_idx])
+    df_sample['ratings'] = list(yelp_join['stars'][true_idx]) + list(yelp_join['stars'][false_idx])
+    df_sample[selected_feature] = ['True'] * sample_size + ['False'] * sample_size   
+
+    selected = alt.selection_multi(fields=[selected_feature], on='dblclick', bind='legend')
+    chart = alt.Chart(df_sample).mark_point(size=35).encode(
+        alt.X('review_count'),
+        alt.Y('ratings:Q', scale=alt.Scale(domain=[0.5,5.5])),
+        alt.Color(selected_feature),
+        opacity=alt.condition(selected, alt.value(1), alt.value(0.2))
+    ).add_selection(selected).properties(width=600).interactive()
+
+    st.write("Now you have your graph! Try to double click one point or a True/False on the right to highlight a certain group.")
+    st.write(chart)
+
+    st.write("You may see that stars do not influence much, while more popular businesses are more likely to react.")
+
+
+yelp_business_df, yelp_covid_df, yelp_join = load_data_from_link() #load_data_from_url()
+
+st.title("How do businesses react to COVID-19")
+
+st.write("In this web page, we will analyze how business react to the COVID-19. We jointly use the data from two sources: the Yelp business dataset(https://www.yelp.com/dataset/download) \
+    and the CMU COVIDcast dataset(https://covidcast.cmu.edu/). We will use these data to explore how different factors effect the businesses after COVID-19 happened.")
 
 # Part 1: Overview on yelp covid features
 st.markdown("## 1. Business state overview")
-st.write("Let's first look at the raw data provided by Yelp for business state under COVID19.") 
+st.write("Let's first look at the raw dataframe from Yelp COVID19 dataset.") 
 
 st.dataframe(yelp_covid_df.head())
 
 # TODO: some descriptions of features
-st.markdown("Bool type: **delivery or takeout**, **Grubhub enabled**, **Call To Action**, **Request a Quote Enabled**")
-st.markdown("Json type: **highlights**")
-st.markdown("Str type: **Covid Banner**, **Virtual Services Offered**")
-st.markdown("Datetime type: **Temporary Closed Until**")
+st.write("The features of the original dataset can be divided into four types: ") 
+st.markdown("- Bool type: **delivery or takeout**, **Grubhub enabled**, **Call To Action**, **Request a Quote Enabled**")
+st.markdown("- Json type: **highlights**")
+st.markdown("- Str type: **Covid Banner**, **Virtual Services Offered**")
+st.markdown("- Datetime type: **Temporary Closed Until**")
 
 # 1.1 show the pairwise relationship between different features
-st.write("These features characterize business state under COVID19. We start by looking at the inner relationship between these features.")
+st.write("In our exploration, we use these features as the indicators for the states of the businesses. Before further explore what factor will influence \
+these features, lets first try to analyze the correlation of them.")
 
 st.markdown("### 1.1 Covid feature correlation")
 st.write("We first change non-bool type features into bool types to see whether there is some inner correlation among these features.")
@@ -297,7 +402,6 @@ yelp_covid_bool_df = get_bool_df(yelp_covid_df)
 show_df = st.checkbox("Show new data")
 if show_df:
     st.dataframe(yelp_covid_bool_df.head())
-# TODO: maybe we can take some not FALSE value in displaying the dataset
 
 total_feature = yelp_covid_bool_df.columns[1:]
 group_dict = get_bool_df_summary(yelp_covid_bool_df)
@@ -314,39 +418,60 @@ if confirm_button:
 
 # 1.1.2 show how one is affected by multiple
 show_covid_feature_multi_relationship(total_feature, yelp_covid_bool_df)
-   
-#TODO: data preprocessing
 
 
-st.write("Then let us look at the cov19 dataset.") 
-#TODO: add some analysis not important
-
-
-st.write("Let us first explore how geometric factor will influence the business situation of the yelp restaurants") 
 # city
 # geometric interactive, state/city
+
+
+st.markdown("## 2. How Businesses' location affect their reaction?")
+
 total_targets = yelp_covid_bool_df.columns[1:]
-st.write("You may also want to see how is the situation for different country across the country.")
-target = st.selectbox('Select one target you want to explore more.', total_targets, 0)
 join_df = get_join_dataset(yelp_business_df[['business_id', 'state', 'city']], yelp_covid_bool_df, 'business_id') #only join with geometric dataset
 states = alt.topo_feature(data.us_10m.url, 'states')
+
+st.markdown("### 2.1 How is the situation for the business in different county/state?")
+
+st.write('First, we try to have an overview that how many data points belongs to eachs states. \
+    This will give intuition about the missing values.')
+
+
+target = st.selectbox('Select one target about the businesses\' condition you want to explore more.', total_targets, 0)
 
 state_dic = join_df[['state', target]].groupby(['state']).mean()
 state_ref = get_state_ref()
 state_dic['id'] = -1
+state_dic['state_name'] = None
+state_dic['review_count'] = 0
+state_list = set()
 for row in state_dic.iterrows():
     if us.states.lookup(row[0]):
         state_name = us.states.lookup(row[0]).name
         state_dic.at[row[0], 'id'] = state_ref.loc[state_name]['id']
+        state_dic.at[row[0], 'state_name'] = state_name
+        state_dic.at[row[0], 'review_count'] = join_df[['state', target]].groupby(['state']).count().at[row[0], target]
+        state_list.add(state_name)
 
 state_dic = state_dic[state_dic['id'] != -1]
 
-st.write("Notice that there are some data from Canada and we remove them")
+chart = alt.Chart(state_dic).mark_bar().encode(
+    alt.X('state_name:N', sort='-y'),
+    alt.Y('review_count:Q'),
+    alt.Color('review_count'),
+).properties(width=600).interactive()
+st.write(chart)
+st.write('We can see that for most of the states, there are nearly no businesses\' data point.')
 
-chart = alt.Chart(state_dic).mark_geoshape().encode(
+
+st.write('Then we will make more exploration about what happen to \
+    The following figure show that the selected feature value for businesses in each state/county, the color refers to the TRUE rate for selected bool varaible.')
+
+st.markdown('**' + target + ' rate in each state**')
+
+chart = alt.Chart(state_dic).mark_geoshape(stroke = "black").encode(
     shape='geo:G',
     color=target + ':Q',
-    tooltip=['state:N', target + ':Q'],
+    tooltip=['state_name:N', target + ':Q'],
 ).transform_lookup(
     lookup='id',
     from_=alt.LookupData(data=states, key='id'),
@@ -359,9 +484,15 @@ chart = alt.Chart(state_dic).mark_geoshape().encode(
 )
 st.write(chart)
 
+st.markdown("> Notice that we have preprocessed the data. The original dataset contains data from countries other than U.S., e.g., data from Canada. We remove all these data entries. The white state/county \
+    here refer to that there is no business record in these places.")
 
-st.write("Why there are differences in business in different locations? Let's explore more about this.")
-st.write("Is this because of the infection rate.")
+
+st.markdown("### 2.2 Reasons for the differences?")
+
+
+st.write("Why there are differences between businesses in different locations? Let's explore more about this. \
+    A possible reason is that different place have different infection rate. Let's find out how infection rate will affect the businesses situation!")
 total_targets = yelp_covid_bool_df.columns[1:]
 st.write("You may also want to see how is the situation for different country across the country.")
 inf_rate_target = st.selectbox('Select one target you want to explore more.', total_targets, 1)
@@ -373,7 +504,7 @@ city_dic_grouped = join_df[['city', inf_rate_target]].groupby(['city'])
 city_dic = city_dic_grouped.mean()
 city_dic_count = city_dic_grouped.sum()
 city_dic['geo_value'] = -1
-dic = pd.read_pickle('https://www.dropbox.com/s/52jh2x4p5b724c3/city_dic.pkl?raw=1')
+dic = pd.read_pickle('dataset/city_dic.pkl')
 # geolocator = Nominatim(user_agent="streamlit")
 # af = addfips.AddFIPS()
 for row in city_dic.iterrows():
@@ -393,32 +524,82 @@ city_dic = city_dic[city_dic['geo_value'] != -1]
 
 
 source = get_join_dataset(city_dic, covid_dataset, 'geo_value')
-st.write(source)
+source['value'] = source['value'] / 1000
 
-st.write(inf_rate_target)
 base = alt.Chart(source).mark_circle().encode(
-    x='value:Q',
+    x=alt.Y('value:Q', title='infection_rate(percentage)'),
     y=inf_rate_target + ':Q',
-)
+    color=alt.Color('geo_value')
+).properties(
+    width=600,
+    height=350,
+).interactive()
 st.write(base)
 
-st.write("## 2. Category and business state")
+st.write("## 3. How Businesses' affect their reaction?")
 
-st.markdown("Let's now explore how businesses of different categories behave.")
+st.markdown("Let's now explore how businesses of different categories behave. \
+    We start by looking at whether different categories react differently with the above COVID features.")
 business_category_info = get_category(yelp_business_df)
 show_business_in_category(yelp_covid_bool_df, business_category_info)
 
-st.markdown("### 2.1 How long do they plan to close")
+st.markdown("### 3.1 How long do they plan to close")
 close_for_how_long(yelp_join)
 
-st.markdown("### 2.2 What do Covid Banner say")
+st.markdown("### 3.2 What do Covid Banner say")
 what_covid_banner_say(yelp_covid_df, business_category_info)
 
-st.markdown("### 2.3 What are in the highlights")
+st.markdown("### 3.3 What are in the highlights")
 business_highlight_info = get_highlight_info(yelp_join)
 what_are_highlights(business_highlight_info)
 
 
 # TODO: state/city change
 
-st.write("Hmm 🤔, is there some correlation between body mass and flipper length? Let's make a scatterplot with [Altair](https://altair-viz.github.io/) to find.")
+st.write("## 4. How businesses' quality affect their reaction?")
+
+st.markdown("Does business quality before COVID-19 have some relationship with their state during COVID-19? We would look at their popularity, measured by review counts, and their ratings.")
+
+st.markdown("### 4.1 Quality overview")
+show_quality_summary(yelp_join)
+
+st.markdown("### 4.2 Stars, review counts, and COVID features")
+quality_vs_covid_feature(yelp_covid_bool_df, yelp_join)
+
+st.write("## 5. Using ML model to prediction?")
+st.write("Now we try to deploy a machine model to predict the business reaction for a selected business data point. \
+    We try to make this into a classification problem so we make all the prediction target to be True/False, \
+        even for highlights and covid banner, we use the location, category, ratings and review_count as the prediction factors.")
+st.write("To simplify the problem, we transfer all first two factors into one-hot-vector. Please notice that location refers to the state here.\
+    We set 80% of the data as the training set and the rest as test set.")
+total_targets = yelp_covid_bool_df.columns[1:]
+label = st.selectbox('Select one target you want to explore more.', total_targets, 0)
+
+X_train, y_train, X_test, y_test = get_dataset(yelp_business_df, ['state', 'categories', 'stars', 'review_count'], yelp_covid_bool_df, label, 0.8)
+
+choose_model = st.selectbox("Choose the ML Model",
+		["Logistic Regression", "Decision Tree", "K-Nearest Neighbours"])
+if choose_model == "K-Nearest Neighbours":
+    st.write("For KNN, we have K=5.")
+    clf = KNeighborsClassifier()
+    clf.fit(X_train, y_train)
+    y_pred = clf.predict(X_test)
+    acc = metrics.accuracy_score(y_test, y_pred) * 100
+    st.write("The prediction acc is:", acc)
+
+elif choose_model == "Logistic Regression":
+    clf = LogisticRegression()
+    clf.fit(X_train, y_train)
+    y_pred = clf.predict(X_test)
+    acc = metrics.accuracy_score(y_test, y_pred) * 100
+    st.write("The prediction acc is:", acc)
+
+elif choose_model == "Decision Tree":
+    clf = DecisionTreeClassifier()
+    clf.fit(X_train, y_train)
+    y_pred = clf.predict(X_test)
+    acc = metrics.accuracy_score(y_test, y_pred) * 100
+    st.write("The prediction acc is:", acc)
+
+
+
