@@ -1,3 +1,15 @@
 streamlit
 pandas
 altair
+covidcast
+numpy
+datetime
+wordcloud
+geopandas
+us
+geopy
+addfips
+vega_datasets
+time
+sklearn
+

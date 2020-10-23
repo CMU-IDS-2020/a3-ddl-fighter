@@ -1,6 +1,6 @@
 # CMU Interactive Data Science Assigment 3
 
-* **Team members**: Haonan Wang and Weiyi Zhang (weiyizha)
+* **Team members**: Haonan Wang(haonanw) and Weiyi Zhang(weiyizha)
 * **Online URL**: https://s4a.streamlit.io/cmu-ids-2020/a3-template/master/streamlit_app.py/+/
 
 ## Instructions
