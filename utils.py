@@ -197,7 +197,6 @@ def get_dataset(feature_set, feature_list, label_set, label, ratio):
     total_features = pd.concat([total_features, get_category(total_features)], axis=1)
     total_features = pd.concat([total_features, pd.get_dummies(total_features['state'])], axis=1)
     total_features = total_features.drop(['categories', 'business_id', 'state'], axis=1)
-    st.write("The dataset after preprocessing is like this:", total_features.head())
     # get_category = 
     total_features = scale(total_features.to_numpy())
     train_num = int(len(total_features) * ratio)
