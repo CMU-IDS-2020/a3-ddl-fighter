@@ -88,7 +88,7 @@ cate_func = {cate_list_multi[0]:if_restaurant, cate_list_multi[1]:if_shopping, c
 @st.cache
 def get_category(yelp_join): # when allowed multi categories
     # business_category_info: index same as yelp_covid_df
-    
+
     business_category_info = pd.DataFrame()
     for cate in cate_list_multi:
         business_category_info[cate] = yelp_join['categories'].apply(cate_func[cate])
@@ -184,41 +184,5 @@ def get_bool_df_summary(yelp_covid_bool_df):
 
     return group_dict
 
-@st.cache
-def get_bool_df_summary(yelp_covid_bool_df):
-    group_dict = {}
-    target_df = pd.DataFrame()
-    for target_feature in total_covid_feature:
-        target_df = pd.DataFrame()
 
-        for other_feature in total_covid_feature:
-            if other_feature == target_feature:
-                group_part = list(yelp_covid_bool_df.groupby(by=[target_feature]).agg({'business_id':'count', target_feature:'min'})['business_id'])
-                group_part.insert(1,0)
-                group_part.insert(3,0)
-                target_df[target_feature + ' type'] = [False, False, True, True]
-                target_df[target_feature] = group_part
-            else:
-                group_part = yelp_covid_bool_df.groupby(by=[target_feature, other_feature]).agg({'business_id':'count',target_feature:'min',other_feature:'min'})
-                target_df[other_feature + ' type'] = list(group_part[other_feature])
-                target_df[other_feature] = list(group_part['business_id'])
-        group_dict[target_feature] = target_df
 
-    return group_dict
-
-def get_dataset(feature_set, feature_list, label_set, label, ratio):
-    feature_list.append('business_id')
-    feature_set = feature_set[feature_list]
-    total_set = pd.merge(feature_set, label_set[['business_id', label]], on='business_id')
-    # total_set
-    total_label = (total_set.to_numpy()[:, -1]).reshape((-1)).astype('int')
-    total_features = total_set[feature_list]
-    total_features = pd.concat([total_features, get_category(total_features)], axis=1)
-    total_features = pd.concat([total_features, pd.get_dummies(total_features['state'])], axis=1)
-    total_features = total_features.drop(['categories', 'business_id', 'state'], axis=1)
-    st.write("The dataset after preprocessing is like this:", total_features.head())
-    # get_category = 
-    total_features = total_features.to_numpy()
-    train_num = int(len(total_features) * ratio)
-    
-    return total_features[0 : train_num], total_label[0 : train_num], total_features[train_num + 1: ], total_label[train_num + 1: ]
