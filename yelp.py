@@ -494,7 +494,6 @@ st.markdown("### 2.2 Reasons for the differences?")
 st.write("Why there are differences between businesses in different locations? Let's explore more about this. \
     A possible reason is that different place have different infection rate. Let's find out how infection rate will affect the businesses situation!")
 total_targets = yelp_covid_bool_df.columns[1:]
-st.write("You may also want to see how is the situation for different country across the country.")
 inf_rate_target = st.selectbox('Select one target you want to explore more.', total_targets, 1)
 
 covid_dataset = load_data_cov19('county')['confirmed_cumulative_prop']
