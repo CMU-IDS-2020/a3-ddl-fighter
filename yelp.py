@@ -582,6 +582,7 @@ st.write("The dataset after preprocessing is like this:", X_train[0:5])
 
 choose_model = st.selectbox("Choose the ML Model",
 		["Logistic Regression", "Decision Tree", "K-Nearest Neighbours"])
+choose_model = None
 if choose_model == "K-Nearest Neighbours":
     st.write("For KNN, we have K=5.")
     clf = KNeighborsClassifier()
